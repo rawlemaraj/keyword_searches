@@ -1,5 +1,5 @@
 import csv
-from collections import defaultdict
+from collections import defaultdict, deque
 
 def search_and_copy(source_file, template_file, keywords, search_column, location_col_name, switch_col_name):
     location_switch_data = defaultdict(lambda: defaultdict(list))
@@ -23,31 +23,26 @@ def search_and_copy(source_file, template_file, keywords, search_column, locatio
         for switch, rows in switches.items():
             print(f"Processing switch: {switch}")
 
-            keyword_rows = defaultdict(list)
+            keyword_rows = defaultdict(deque)
 
             with open(template_file, 'r') as tmplfile:
                 print("Reading template file...")
                 template_reader = csv.reader(tmplfile)
                 template_content = list(template_reader)
 
-            for row in rows:
-                for keyword in keywords:
-                    if keyword.lower() in row[search_column].lower():
-                        keyword_rows[keyword].append(row)
-
-            new_rows = []
-
+            keyword_to_template_indices = defaultdict(deque)
             for idx, template_row in enumerate(template_content):
                 for keyword in keywords:
                     if keyword.lower() in str(template_row).lower():
-                        for row in keyword_rows[keyword]:
-                            new_row = list(template_row[:])
-                            new_row.extend(list(row.values()))
-                            new_rows.append(new_row)
-                        print(f"Updated rows for keyword: {keyword} in template")
-                        break
+                        keyword_to_template_indices[keyword.lower()].append(idx)
 
-            template_content.extend(new_rows)
+            for row in rows:
+                for keyword in keywords:
+                    if keyword.lower() in row[search_column].lower():
+                        if keyword_to_template_indices[keyword.lower()]:
+                            idx = keyword_to_template_indices[keyword.lower()].popleft()
+                            template_content[idx].extend(list(row.values()))
+                            print(f"Updated row {idx} for keyword: {keyword} in template")
 
             output_filename = f"{location}_{switch}_{template_file}"
             with open(output_filename, 'w', newline='') as outfile:
